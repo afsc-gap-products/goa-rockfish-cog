@@ -3,7 +3,7 @@ title: "Rockfish ESR draft"
 author: "Alexandra Dowlin, Christina Conrath"
 date: "`r Sys.Date()`"
 output: 
-  bookdown::html_document2
+  bookdown::word_document2
 bibliography: ../citations.bib
 ---
 
@@ -16,9 +16,9 @@ year <- 2025
 The fundamental approach for calculating GOA rockfish distribution indicators has not changed in `r year`; however, some aspects of the analysis and visualizations have been updated. The indicators represent design-based CPUE-weighted mean latitude, longitude, temperature and depth, weighted by the rockfish catch-per-unit-effort in units of biomass per area swept. In previous years, linear models were used to estimate trends in the weighted mean depth, temperature, and distance from Hinchenbrook Island over time. Now, these trends are reported as time series with uncertainty for visual evaluation of short- and long-term patterns, and weighted mean latitude and longitude are presented in ‘sparkle plots’ (bivariate scatterplots with error bars in both axis dimensions). 
 
 ## Indicator description
-In a previous analysis of rockfish from 14 bottom trawl surveys in the Gulf of Alaska and Aleutian Islands ([@rooper_ecological_2008]), five species assemblages were defined based on similarities in their distributions along geographical position, depth, and temperature gradients. The 180 m and 275 m depth contours were major divisions between rockfish assemblages inhabiting the shelf, shelf break, and lower continental slope. Another noticeable division was between species centered in southeastern Alaska and those found in the northern Gulf of Alaska and Aleutian Islands.
+In a previous analysis of rockfish from 14 bottom trawl surveys in the Gulf of Alaska and Aleutian Islands [@rooper_ecological_2008], six species assemblages were defined based on similarities in their distributions along geographical position, depth, and temperature gradients: Pacific ocean perch, shortraker rockfish, northern rockfish, dusky rockfish  rougheye-blackspotted rockfish complex, and shortspine thornyhead. The 180 m and 275 m depth contours were major divisions between rockfish assemblages inhabiting the shelf, shelf break, and lower continental slope. Another noticeable division was between species centered in southeastern Alaska and those found in the northern Gulf of Alaska and Aleutian Islands.
 
-In this time series, the mean-weighted distributions of six rockfish taxa (four Sebastes species, rougheye-blackspotted rockfish complex, and Sebastolobus alascanus) along the three environmental gradients (position, depth and temperature) were calculated for the Gulf of Alaska and Aleutian Islands. These indices are also known as the center of gravity of population density with respect to a spatial or environmental variable. A weighted mean value for each spatial or environmental variable was computed for each survey as:
+In this time series, the mean-weighted distributions of these six rockfish taxa along the three environmental gradients (position, depth and temperature) were calculated for the Gulf of Alaska and Aleutian Islands. These indices are also known as the center of gravity of population density with respect to a spatial or environmental variable. A weighted mean value for each spatial or environmental variable was computed for each survey as:
 
 $$
 x = \frac{\sum f_i x_i }{\sum f_i}
