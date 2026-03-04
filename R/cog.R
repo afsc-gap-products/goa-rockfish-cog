@@ -20,8 +20,11 @@ if (file.exists("Z:/Projects/ConnectToOracle.R")) {
   channel <- gapindex::get_connected(check_access = FALSE)
 }
 
-## TODO: Set latest GOA survey year
-yr_goa <- 2025
+## TODO: Set survey area
+survey <- c("AI", "GOA")[1]
+
+## TODO: Set latest GOA or AI survey year
+yr <- 2023
 
 ## Define species and species groupings
 rf_groups <- data.frame(
@@ -30,13 +33,25 @@ rf_groups <- data.frame(
 )
 
 ## Pull data
-gp_data <- 
-  gapindex::get_data(year_set = c(seq(from = 1990, to = 1999, by = 3),
-                                  seq(from = 2003, to = yr_goa, by = 2)),
-                     survey_set = "GOA",
-                     spp_codes = rf_groups,
-                     channel = channel
-  )
+if(survey == "GOA") {
+  gp_data <- 
+    gapindex::get_data(year_set = c(seq(from = 1990, to = 1999, by = 3),
+                                    seq(from = 2003, to = yr, by = 2)),
+                       survey_set = survey,
+                       spp_codes = rf_groups,
+                       channel = channel
+    )
+} 
+
+if(survey == "AI") {
+  gp_data <- 
+    gapindex::get_data(year_set = c(seq(from = 1991, to = 2000, by = 3),
+                                    seq(from = 2002, to = yr, by = 2)),
+                       survey_set = survey,
+                       spp_codes = rf_groups,
+                       channel = channel
+    )
+}
 
 ## Calculate cpue
 gp_cpue <- gapindex::calc_cpue(gapdata = gp_data) |> as.data.frame()
@@ -95,4 +110,4 @@ for (imetric in c("DEPTH_M", "BOTTOM_TEMPERATURE_C",
     ) 
 }
 
-write.csv(cogs, here::here("output", paste0("rf_cogs_", yr_goa, ".csv")), row.names = FALSE)
+write.csv(cogs, here::here("output", paste0("rf_cogs_", survey, "_", yr, ".csv")), row.names = FALSE)
