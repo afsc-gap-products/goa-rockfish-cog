@@ -135,57 +135,48 @@ colnames(cog_lat)[4:6] <- c("est_lat", "lwr_lat", "upr_lat")
 cog_lon <- coord_out[coord_out$metric == "Longitude", c(1:4, 6:7)]
 colnames(cog_lon)[4:6] <- c("est_lon", "lwr_lon", "upr_lon")
 
-cog_sparkle <- cog_lat %>% left_join(cog_lon, by = c("species_code", "year"))
+# Correct "wrapping" around the IDL
+cog_lon <- cog_lon %>%
+  mutate(across(c(est_lon, lwr_lon, upr_lon), 
+                ~case_when(. > 0 ~ (((180 - .) + 180) * -1), 
+                           TRUE  ~ .)))
 
-unique_years <- sort(unique(cog_sparkle$year))
-
-# Iteratively add years and error bars so the most recent year is on top
-sparkle <- ggplot() +
-  geom_errorbar(
-    data = dplyr::filter(cog_sparkle, year ==  unique_years[1]), 
-                mapping = aes(x = est_lon, ymin = lwr_lat, ymax = upr_lat, color = year), 
-    alpha = 0.4,
-    width = 0) +
-  geom_errorbarh(
-    data = dplyr::filter(cog_sparkle, year ==  unique_years[1]),
-                 mapping = aes(xmin = lwr_lon, xmax = upr_lon, y = est_lat, color = year), 
-    alpha = 0.4,
-    width = 0
-    ) +
-  geom_point(
-    data = dplyr::filter(cog_sparkle, year ==  unique_years[1]), 
-             mapping = aes(x = est_lon, y = est_lat, color = year)
-    )
-
-for(ii in 2:length(unique_years)) {
-  sparkle <- 
-    sparkle +
-    geom_errorbar(
-      data = dplyr::filter(cog_sparkle, year ==  unique_years[ii]), 
-      mapping = aes(x = est_lon, ymin = lwr_lat, ymax = upr_lat, color = year), 
-      alpha = 0.4,
-      width = 0) +
-    geom_errorbarh(
-      data = dplyr::filter(cog_sparkle, year ==  unique_years[ii]),
-      mapping = aes(xmin = lwr_lon, xmax = upr_lon, y = est_lat, color = year), 
-      alpha = 0.4,
-      width = 0
-    ) +
-    geom_point(
-      data = dplyr::filter(cog_sparkle, year ==  unique_years[ii]), 
-      mapping = aes(x = est_lon, y = est_lat, color = year)
-    )
+# Combine with latitude and plot
+cog_sparkle <- cog_lat %>% left_join(cog_lon, by = c("species_code", "year")) %>% arrange(year)
   
-}
+# List of years
+years_ordered <- sort(unique(cog_sparkle$year))
 
-sparkle <- 
-  sparkle +
-  scale_color_viridis(name = "Year", option = "plasma", discrete = FALSE, end = 0.9) +
-  xlab("Longitude (\u00B0W)") + ylab("Latitude (\u00B0N)") +
-  scale_x_continuous(breaks = scales::pretty_breaks(n = 3)) +
+# Build the base plot with facets and scales (but no data layers yet)
+sparkle <- ggplot(cog_sparkle, aes(color = year)) +
+  scale_color_viridis(name = "Year", option = "plasma", end = 0.9) +
+  scale_x_continuous(breaks = c(-185, -180, -175), labels = c(175, 0, -175)) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 3)) +
-  facet_wrap(~species_code, ncol = 2)
+  facet_wrap(~species_code, ncol = 2) +
+  labs(x = "Longitude (\u00B0W)", y = "Latitude (\u00B0N)")
+
+# Create a list of error bars & points for each year
+year_layers <- purrr::map(years_ordered, ~{
+  year_data <- filter(cog_sparkle, year == .x)
+  list(
+    geom_errorbar(data = year_data, 
+                  aes(x = est_lon, ymin = lwr_lat, ymax = upr_lat), 
+                  alpha = 0.4, 
+                  orientation = "x", 
+                  width = 0),
+    geom_errorbar(data = year_data, 
+                  aes(y = est_lat, xmin = lwr_lon, xmax = upr_lon), 
+                  alpha = 0.4, 
+                  orientation = "y",
+                  width = 0),
+    geom_point(data = year_data, aes(x = est_lon, y = est_lat))
+  )
+})
+
+# Add layers to the plot
+sparkle <- sparkle + year_layers
 sparkle
+
 
 # Maps ------------------------------------------------------------------------
 world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
@@ -234,7 +225,7 @@ for(ii in 2:length(unique_years)) {
 }
 
 map <- map + 
-  coord_sf(xlim = c(-162.5, -140), ylim = c(54, 60), expand = FALSE) +
+  coord_sf(xlim = c(-180, -140), ylim = c(54, 60), expand = FALSE) +
   scale_color_viridis(name = "Year", option = "plasma", discrete = FALSE, end = 0.9) +
   scale_x_continuous(breaks = c(-160, -145)) +
   scale_y_continuous(breaks = c(55, 60)) +
