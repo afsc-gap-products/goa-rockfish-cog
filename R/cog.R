@@ -24,7 +24,7 @@ if (file.exists("Z:/Projects/ConnectToOracle.R")) {
 survey <- c("AI", "GOA")[1]
 
 ## TODO: Set latest GOA or AI survey year
-yr <- 2023
+yr <- 2024
 
 ## Define species and species groupings
 rf_groups <- data.frame(
@@ -56,7 +56,6 @@ if(survey == "AI") {
 ## Calculate cpue
 gp_cpue <- gapindex::calc_cpue(gapdata = gp_data) |> as.data.frame()
 
-
 calc_weighted_mean <- function(x, w, lwr_p = 0.025, upr_p = 0.975) {
   ## Count the number of records that have a positive weight (w) 
   ## and a metric (some metrics are missing from some hauls) 
@@ -83,11 +82,21 @@ calc_weighted_mean <- function(x, w, lwr_p = 0.025, upr_p = 0.975) {
   )
 }
 
+## Translate latitude and longitdue to UTM
+utm <- sf::st_as_sf(
+  cbind.data.frame(X = gp_cpue$LONGITUDE_DD_START, 
+                   Y = gp_cpue$LATITUDE_DD_START), 
+  coords = c("X", "Y"), 
+  crs = 4326)
+utm <- sf::st_transform(utm, "+proj=utm +zone=5 +datum=WGS84 +units=km")
+utm <- data.frame(sf::st_coordinates(utm))
+
+gp_cpue <- cbind.data.frame(gp_cpue, X = utm$X, Y = utm$Y)
+
 ## Loop over metrics and calculate weighted means, SEs, and CIs 
 ## for each species and year
 cogs <- data.frame()
-for (imetric in c("DEPTH_M", "BOTTOM_TEMPERATURE_C", 
-                  "LATITUDE_DD_START", "LONGITUDE_DD_START")){
+for (imetric in c("DEPTH_M", "BOTTOM_TEMPERATURE_C", "X", "Y")){
   cogs <- 
     rbind(cogs,
           data.frame(

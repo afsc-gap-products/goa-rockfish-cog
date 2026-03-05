@@ -1,12 +1,12 @@
-#' Plots of empirical center of gravity for GOA rockfish. COG is generated in 
-#' the cog.R script. 
+#' Plots of empirical center of gravity for rockfish. COG is generated in the 
+#' cog.R script. 
 #' 
 #' There are three plot types produced in this script:
 #' 1. Time series plot of depth, bottom temperature, eastings, and northings
 #'    for all species to facilitate direct comparisons.
 #' 2. 'Sparkle' plot - bivariate scatterplot of latitude and longitude to 
 #'    demonstrate changes in relative COG over time.
-#' 3. Map of COG relative to the GOA coastline. Most useful for nearshore 
+#' 3. Map of COG relative to the coastline. Most useful for nearshore 
 #'    species with limited distributions. May be misleading for stocks where
 #'    the empirical COG is outside of the survey domain.
 #'    
@@ -52,13 +52,16 @@ theme_set(theme_sleek())
 
 # Data import & cleaning ------------------------------------------------------
 # Either read in existing COG file, or calculate empirical cog using R script.
-# Set most recent GOA survey year
-yr_goa <- 2025
+## TODO: Set survey area
+survey <- c("AI", "GOA")[1]
 
-if (file.exists(here("output", paste0("rf_cogs_", yr_goa, ".csv")))) {
-  cogs <- read.csv(here("output", paste0("rf_cogs_", yr_goa, ".csv")))
+## TODO: Set latest GOA or AI survey year
+yr <- 2024
+
+if (file.exists(here("output", paste0("rf_cogs_", survey, "_", yr, ".csv")))) {
+  cogs <- read.csv(here("output", paste0("rf_cogs_", survey, "_", yr, ".csv")))
 } else {
-  # TODO: make sure you've updated cog.R to pull the most-recent GOA survey data!
+  # TODO: make sure you've updated cog.R to pull the correct survey data!
   source(here("R", "cog.R"))
 }
 
@@ -76,9 +79,9 @@ cogs_plot <- cogs %>%
   mutate(metric = case_when(
     metric == "BOTTOM_TEMPERATURE_C" ~ "Bottom Temp (\u00B0C)",
     metric == "DEPTH_M" ~ "Depth (m)",
-    metric == "LATITUDE_DD_START" ~ "Latitude",
-    metric == "LONGITUDE_DD_START" ~ "Longitude"
-  )) %>%
+    metric == "X" ~ "Eastings (km)",
+    metric == "Y" ~ "Northings (km)",
+    )) %>%
   # Remove first two dusky points (1990 & 1993; data should start in 1996)
   filter(!(species_code == "Dusky Rockfish" & year <= 1996)) %>% 
   # Make depth estimates negative for inverted axis when plotting
@@ -87,36 +90,10 @@ cogs_plot <- cogs %>%
          lwr = if_else(metric == "Depth (m)", -lwr, lwr))
 
 # Time series plot ------------------------------------------------------------
-# Transform latitude & longitude to UTM (for estimates, upper & lower bounds)
-utm_transform <- function(column) {
-  utm <- data.frame(Y = cogs_plot[cogs_plot$metric == "Latitude", column],
-                    X = cogs_plot[cogs_plot$metric == "Longitude", column],
-                    species_code = cogs_plot[cogs_plot$metric == "Longitude", "species_code"], 
-                    year = cogs_plot[cogs_plot$metric == "Longitude", "year"])
-  
-  sp::coordinates(utm) <- ~ X + Y
-  sp::proj4string(utm) <- sp::CRS("+proj=longlat +datum=WGS84")
-  utm <- as.data.frame(sp::spTransform(utm, sp::CRS("+proj=utm +zone=5 +units=km")))
-  colnames(utm)[c(3:4)] <- c("Eastings (km)", "Northings (km)")
-  
-  utm <- reshape2::melt(utm, 
-                        id.vars = c("species_code", "year"), 
-                        variable.name = "metric",
-                        value.name = column)
-  return(utm)
-}
-
-utm_out <- cbind.data.frame(utm_transform("est"),
-                            se = utm_transform("se")$se,
-                            lwr = utm_transform("lwr")$lwr,
-                            upr = utm_transform("upr")$upr)
-
 # Special colors from naturalparkcolors::park_palette("Saguaro)
 pal <- c("#847CA3", "#E45A5A", "#F4A65E", "#80792B", "#F2D56F", "#1A1237")
 
-ts_plot <- rbind.data.frame(cogs_plot %>% filter(!metric %in% c("Latitude", "Longitude")),
-                            utm_out[, c(3, 1, 2, 4:7)]) %>%  # Combine original & UTM dataframes
-  ggplot(., aes(x = year, y = est)) +
+ts_plot <- ggplot(cogs_plot, aes(x = year, y = est)) +
   geom_line(aes(color = species_code)) +
   geom_ribbon(aes(ymin = lwr, ymax = upr, fill = species_code), alpha = 0.4) +
   xlab("Year") + ylab("Weighted Mean") +
@@ -128,10 +105,35 @@ ts_plot <- rbind.data.frame(cogs_plot %>% filter(!metric %in% c("Latitude", "Lon
 ts_plot
 
 # Sparkleplot (bivariate scatter plot for lat & lon) --------------------------
-cog_lat <- cogs_plot[cogs_plot$metric == "Latitude", c(2:4, 6:7)]
-colnames(cog_lat)[3:5] <- c("est_lat", "lwr_lat", "upr_lat")
-cog_lon <- cogs_plot[cogs_plot$metric == "Longitude", c(2:4, 6:7)]
-colnames(cog_lon)[3:5] <- c("est_lon", "lwr_lon", "upr_lon")
+# Transform UTM to latitude/longidue (for estimates, upper & lower bounds)
+coord_transform <- function(column) {
+  utm <- data.frame(Y = cogs_plot[cogs_plot$metric == "Northings (km)", column],
+                    X = cogs_plot[cogs_plot$metric == "Eastings (km)", column])
+  latlon <- sf::st_as_sf(utm,
+                         coords = c("X", "Y"),
+                         crs = "+proj=utm +zone=5 +datum=WGS84 +units=km")
+  latlon <- sf::st_transform(latlon, crs = 4326)
+  latlon <- data.frame(sf::st_coordinates(latlon))
+  latlon_out <- cbind.data.frame(species_code = cogs_plot[cogs_plot$metric == "Eastings (km)", "species_code"],
+                                 year = cogs_plot[cogs_plot$metric == "Eastings (km)", "year"],
+                                 Latitude = latlon$Y,
+                                 Longitude = latlon$X)
+  latlon_out <- reshape2::melt(latlon_out, 
+                               id.vars = c("species_code", "year"), 
+                               variable.name = "metric",
+                               value.name = column)
+  return(latlon_out)
+}
+
+coord_out <- cbind.data.frame(coord_transform("est"),
+                              se = coord_transform("se")$se,
+                              lwr = coord_transform("lwr")$lwr,
+                              upr = coord_transform("upr")$upr)
+
+cog_lat <- coord_out[coord_out$metric == "Latitude", c(1:4, 6:7)]
+colnames(cog_lat)[4:6] <- c("est_lat", "lwr_lat", "upr_lat")
+cog_lon <- coord_out[coord_out$metric == "Longitude", c(1:4, 6:7)]
+colnames(cog_lon)[4:6] <- c("est_lon", "lwr_lon", "upr_lon")
 
 cog_sparkle <- cog_lat %>% left_join(cog_lon, by = c("species_code", "year"))
 
