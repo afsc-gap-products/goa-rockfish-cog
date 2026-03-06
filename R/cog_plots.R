@@ -135,22 +135,21 @@ colnames(cog_lat)[4:6] <- c("est_lat", "lwr_lat", "upr_lat")
 cog_lon <- coord_out[coord_out$metric == "Longitude", c(1:4, 6:7)]
 colnames(cog_lon)[4:6] <- c("est_lon", "lwr_lon", "upr_lon")
 
-# Correct "wrapping" around the IDL
+# Correct "wrapping" around the IDL (only necessary for the AI)
 cog_lon <- cog_lon %>%
   mutate(across(c(est_lon, lwr_lon, upr_lon), 
                 ~case_when(. > 0 ~ (((180 - .) + 180) * -1), 
                            TRUE  ~ .)))
 
-# Combine with latitude and plot
-cog_sparkle <- cog_lat %>% left_join(cog_lon, by = c("species_code", "year")) %>% arrange(year)
-  
-# List of years
-years_ordered <- sort(unique(cog_sparkle$year))
+# Combine with latitude
+cog_sparkle <- cog_lat %>% 
+  left_join(cog_lon, by = c("species_code", "year")) %>% 
+  arrange(year)
 
 # Build the base plot with facets and scales (but no data layers yet)
+years_ordered <- sort(unique(cog_sparkle$year)) # List of years
 sparkle <- ggplot(cog_sparkle, aes(color = year)) +
   scale_color_viridis(name = "Year", option = "plasma", end = 0.9) +
-  scale_x_continuous(breaks = c(-185, -180, -175), labels = c(175, 0, -175)) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 3)) +
   facet_wrap(~species_code, ncol = 2) +
   labs(x = "Longitude (\u00B0W)", y = "Latitude (\u00B0N)")
@@ -175,6 +174,16 @@ year_layers <- purrr::map(years_ordered, ~{
 
 # Add layers to the plot
 sparkle <- sparkle + year_layers
+
+# Set x-axis labels based on survey region
+if(survey == "GOA") {
+  sparkle <- sparkle + 
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))
+}
+if(survey == "AI") {
+  sparkle <- sparkle + 
+    scale_x_continuous(breaks = c(-185, -180, -175), labels = c(175, 0, -175)) 
+}
 sparkle
 
 
