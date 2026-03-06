@@ -20,12 +20,6 @@ if (file.exists("Z:/Projects/ConnectToOracle.R")) {
   channel <- gapindex::get_connected(check_access = FALSE)
 }
 
-## TODO: Set survey area
-survey <- c("AI", "GOA")[1]
-
-## TODO: Set latest GOA or AI survey year
-yr <- 2024
-
 ## Define species and species groupings
 rf_groups <- data.frame(
   GROUP_CODE   = c(30060, 30050, 30050, 30050, 30576, 30420, 30152, 30020),

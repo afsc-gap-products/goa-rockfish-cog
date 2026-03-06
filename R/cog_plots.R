@@ -23,47 +23,19 @@ library(reshape2)
 library(rnaturalearth)
 library(rnaturalearthdata)
 
-# Set ggplot theme
-# theme_sleek() from ggsidekick (github.com/seananderson/ggsidekick)
-theme_sleek <- function(base_size = 11, base_family = "") {
-  half_line <- base_size/2
-  theme_light(base_size = base_size, base_family = base_family) +
-    theme(
-      panel.grid.major = element_blank(),
-      panel.grid.minor = element_blank(),
-      axis.ticks.length = unit(half_line / 2.2, "pt"),
-      strip.background = element_rect(fill = NA, colour = NA),
-      strip.text.x = element_text(colour = "grey30"),
-      strip.text.y = element_text(colour = "grey30"),
-      axis.text = element_text(colour = "grey30"),
-      axis.title = element_text(colour = "grey30"),
-      legend.title = element_text(colour = "grey30", size = rel(0.9)),
-      panel.border = element_rect(fill = NA, colour = "grey70", linewidth = 1),
-      legend.key.size = unit(0.9, "lines"),
-      legend.text = element_text(size = rel(0.7), colour = "grey30"),
-      legend.key = element_rect(colour = NA, fill = NA),
-      legend.background = element_rect(colour = NA, fill = NA),
-      plot.title = element_text(colour = "grey30", size = rel(1)),
-      plot.subtitle = element_text(colour = "grey30", size = rel(.85))
-    )
-}
+# Set up plot aesthetics (ggplot theme, color palette)
+source(here("R", "aesthetics.R"))
 
-theme_set(theme_sleek())
 
-# Data import & cleaning ------------------------------------------------------
-# Either read in existing COG file, or calculate empirical cog using R script.
-## TODO: Set survey area
+# Set up and run empirical COG; clean up data ---------------------------------
+# TODO: Set survey area
 survey <- c("AI", "GOA")[1]
 
-## TODO: Set latest GOA or AI survey year
-yr <- 2024
+# Set year to current year
+yr <- as.numeric(format(Sys.Date(), "%Y"))
 
-if (file.exists(here("output", paste0("rf_cogs_", survey, "_", yr, ".csv")))) {
-  cogs <- read.csv(here("output", paste0("rf_cogs_", survey, "_", yr, ".csv")))
-} else {
-  # TODO: make sure you've updated cog.R to pull the correct survey data!
-  source(here("R", "cog.R"))
-}
+# Calculate empirical cog using R script.
+source(here("R", "cog.R"))
 
 # Update dataframe to have common names, cleaner labels, correct axis
 cogs_plot <- cogs %>%
@@ -89,10 +61,8 @@ cogs_plot <- cogs %>%
          upr = if_else(metric == "Depth (m)", -upr, upr),
          lwr = if_else(metric == "Depth (m)", -lwr, lwr))
 
-# Time series plot ------------------------------------------------------------
-# Special colors from naturalparkcolors::park_palette("Saguaro)
-pal <- c("#847CA3", "#E45A5A", "#F4A65E", "#80792B", "#F2D56F", "#1A1237")
 
+# Time series plot ------------------------------------------------------------
 ts_plot <- ggplot(cogs_plot, aes(x = year, y = est)) +
   geom_line(aes(color = species_code)) +
   geom_ribbon(aes(ymin = lwr, ymax = upr, fill = species_code), alpha = 0.4) +
@@ -103,6 +73,7 @@ ts_plot <- ggplot(cogs_plot, aes(x = year, y = est)) +
   scale_y_continuous(labels = function(est) abs(est)) +
   facet_wrap(~ metric, scales = "free_y") 
 ts_plot
+
 
 # Sparkleplot (bivariate scatter plot for lat & lon) --------------------------
 # Transform UTM to latitude/longidue (for estimates, upper & lower bounds)
