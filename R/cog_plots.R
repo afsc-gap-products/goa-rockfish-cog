@@ -162,56 +162,31 @@ sparkle
 world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
 sf::sf_use_s2(FALSE)  # turn off spherical geometry
 
-map <- ggplot() +
-  geom_sf(data = world) +
-  geom_errorbar(
-    data = dplyr::filter(cog_sparkle, year ==  unique_years[1]), 
-    mapping = aes(x = est_lon, ymin = lwr_lat, ymax = upr_lat, color = year), 
-    alpha = 0.4,
-    width = 0) +
-  geom_errorbarh(
-    data = dplyr::filter(cog_sparkle, year ==  unique_years[1]),
-    mapping = aes(xmin = lwr_lon, xmax = upr_lon, y = est_lat, color = year), 
-    alpha = 0.4,
-    width = 0
-  ) +
-  geom_point(
-    data = dplyr::filter(cog_sparkle, year ==  unique_years[1]), 
-    mapping = aes(x = est_lon, y = est_lat, color = year),
-    size = 1.5
-  )
-  
-
-for(ii in 2:length(unique_years)) {
-  map <- 
-    map +
-    geom_errorbar(
-      data = dplyr::filter(cog_sparkle, year ==  unique_years[ii]), 
-      mapping = aes(x = est_lon, ymin = lwr_lat, ymax = upr_lat, color = year), 
-      alpha = 0.4,
-      width = 0) +
-    geom_errorbarh(
-      data = dplyr::filter(cog_sparkle, year ==  unique_years[ii]),
-      mapping = aes(xmin = lwr_lon, xmax = upr_lon, y = est_lat, color = year), 
-      alpha = 0.4,
-      width = 0
-    ) +
-    geom_point(
-      data = dplyr::filter(cog_sparkle, year ==  unique_years[ii]), 
-      mapping = aes(x = est_lon, y = est_lat, color = year),
-      size = 1.5
-    )
-  
-}
-
-map <- map + 
-  coord_sf(xlim = c(-180, -140), ylim = c(54, 60), expand = FALSE) +
+map <- ggplot(data = world) +
+  geom_sf() +
+  geom_point(data = cog_sparkle, aes(x = est_lon, y = est_lat, color = year), size = 1.5) +
+  geom_errorbar(data = cog_sparkle, aes(x = est_lon, ymin = lwr_lat, ymax = upr_lat, color = year), alpha = 0.4) +
+  geom_errorbarh(data = cog_sparkle, aes(y = est_lat, xmin = lwr_lon, xmax = upr_lon, color = year), alpha = 0.4) +
   scale_color_viridis(name = "Year", option = "plasma", discrete = FALSE, end = 0.9) +
-  scale_x_continuous(breaks = c(-160, -145)) +
-  scale_y_continuous(breaks = c(55, 60)) +
   labs(x = NULL, y = NULL) +
   facet_wrap(~species_code, ncol = 2)
+
+if(survey == "AI") {
+  map <- map +
+    coord_sf(xlim = c(-180, -170), ylim = c(51, 55), expand = FALSE) +
+    scale_x_continuous(breaks = c(-180, -170)) +
+    scale_y_continuous(breaks = c(51, 55)) 
+}
+
+if(survey == "GOA") {
+  map <- map +
+    coord_sf(xlim = c(-162.5, -140), ylim = c(54, 60), expand = FALSE) +
+    scale_x_continuous(breaks = c(-160, -145)) +
+    scale_y_continuous(breaks = c(55, 60)) 
+}
+
 map
+
 
 # Save plots ------------------------------------------------------------------
 # Create a directory for latest GOA survey year if it doesn't already exist
@@ -220,9 +195,9 @@ if (!dir.exists(dir)) {
   dir.create(dir)
 }
 
-ggsave(ts_plot, filename = here(dir, "rf_cog_ts.png"), 
+ggsave(ts_plot, filename = here(dir, paste0("rf_cog_ts_", survey, "_", ".png")), 
        width = 200, height = 110, unit = "mm", dpi = 300)
-ggsave(sparkle, filename = here(dir, "rf_cog_sparkle.png"), 
+ggsave(sparkle, filename = here(dir, paste0("rf_cog_sparkle_", survey, "_", ".png")), 
        width = 180, height = 150, unit = "mm", dpi = 300)
-ggsave(map, filename = here(dir, "rf_cog_map.png"), 
+ggsave(map, filename = here(dir, paste0("rf_cog_map_", survey, "_", ".png")), 
        width = 180, height = 140, unit = "mm", dpi = 300)
