@@ -71,7 +71,7 @@ ts_plot <- ggplot(cogs_plot, aes(x = year, y = est)) +
   scale_fill_manual(values = pal) +
   scale_y_continuous(labels = function(est) abs(est)) +
   facet_wrap(~ metric, scales = "free_y") 
-ts_plot
+ts_plot  # view plot
 
 
 # Sparkleplot (bivariate scatter plot for lat & lon) --------------------------
@@ -125,6 +125,7 @@ if(survey == "GOA") {
   cog_sparkle <- cog_latlon
 }
 
+# Build layered plot, so more recent years are on top
 # Build the base plot with facets and scales (but no data layers yet)
 years_ordered <- sort(unique(cog_sparkle$year)) # List of years
 sparkle <- ggplot(cog_sparkle, aes(color = year)) +
@@ -163,73 +164,73 @@ if(survey == "AI") {
   sparkle <- sparkle + 
     scale_x_continuous(breaks = c(-185, -180, -175), labels = c(175, 0, -175)) 
 }
-sparkle
+sparkle  # view plot
 
 
 # Maps ------------------------------------------------------------------------
 world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
-sf::sf_use_s2(FALSE)  # turn off spherical geometry
+sf::sf_use_s2(FALSE) # turn off spherical geometry
 
 if(survey == "AI") {
-  # Subset world to Aleutian Islands region
+  # Subset world to the Aleutians (split along IDL, then stitch back together)
   western_half <- sf::st_crop(world, xmin = 170, xmax = 180, ymin = 48, ymax = 55)
   eastern_half <- sf::st_crop(world, xmin = -180, xmax = -170, ymin = 48, ymax = 55)
-  aleutians_full <- bind_rows(western_half, eastern_half) %>%
-    sf::st_shift_longitude() 
+  map_bg <- bind_rows(western_half, eastern_half) %>%
+    sf::st_shift_longitude()
   
   # Transform data to continuous scale across date line for plotting
-  cog_360 <- cog_latlon %>%
-    mutate(lon_360 = ifelse(est_lon < 0, est_lon + 360, est_lon),
-           lwr_360 = ifelse(lwr_lon < 0, lwr_lon + 360, lwr_lon),
-           upr_360 = ifelse(upr_lon < 0, upr_lon + 360, upr_lon))
+  map_data <- cog_latlon %>%
+    mutate(x_plot = ifelse(est_lon < 0, est_lon + 360, est_lon),
+           xmin_plot = ifelse(lwr_lon < 0, lwr_lon + 360, lwr_lon),
+           xmax_plot = ifelse(upr_lon < 0, upr_lon + 360, upr_lon),
+           y_plot = est_lat)
   
-  map <- ggplot(data = aleutians_full) +
-    geom_sf() +
-    geom_point(data = cog_360, 
-               aes(x = lon_360, y = est_lat, color = year), 
-               size = 1.5) +
-    geom_errorbar(data = cog_360, 
-                  aes(x = lon_360, ymin = lwr_lat, ymax = upr_lat, color = year), 
-                  alpha = 0.4, 
-                  orientation = "x", 
-                  width = 0) +
-    geom_errorbar(data = cog_360, 
-                  aes(y = est_lat, xmin = lwr_360, xmax = upr_360, color = year), 
-                  alpha = 0.4, 
-                  orientation = "y",
-                  width = 0) +
-    scale_color_viridis(name = "Year", option = "plasma", discrete = FALSE, end = 0.9) +
-    labs(x = NULL, y = NULL) +
-    scale_y_continuous(breaks = scales::pretty_breaks(n = 3)) +
-    scale_x_continuous(breaks = scales::pretty_breaks(n = 3)) +  # not working well!
-    facet_wrap(~species_code, ncol = 2) 
-}
+  # Set x-axis scale - THIS DOESN'T REALLY WORK
+  x_scale <- scale_x_continuous(breaks = c(175, 180, 185, 190))
+  # Map view limits (using 360 scale for X)
+  map_coord <- coord_sf(xlim = c(173, 190), ylim = c(50, 55), expand = FALSE, datum = NULL)
+  
+} 
 
 if(survey == "GOA") {
-  map <- ggplot(data = world) +
-    geom_sf() +
-    geom_point(data = cog_latlon, 
-               aes(x = est_lon, y = est_lat, color = year), 
-               size = 1.5) +
-    geom_errorbar(data = cog_latlon, 
-                  aes(x = est_lon, ymin = lwr_lat, ymax = upr_lat, color = year), 
-                  alpha = 0.4, 
-                  orientation = "x", 
-                  width = 0) +
-    geom_errorbar(data = cog_latlon, 
-                  aes(y = est_lat, xmin = lwr_lon, xmax = upr_lon, color = year), 
-                  alpha = 0.4, 
-                  orientation = "y",
-                  width = 0) +
-    coord_sf(xlim = c(-162.5, -140), ylim = c(54, 60), expand = FALSE) +
-    scale_color_viridis(name = "Year", option = "plasma", discrete = FALSE, end = 0.9) +
-    scale_x_continuous(breaks = c(-160, -145)) +
-    scale_y_continuous(breaks = c(55, 60)) +
-    labs(x = NULL, y = NULL) +
-    facet_wrap(~species_code, ncol = 2)
+  map_bg <- world
+  
+  # Prepare GOA data (standard coordinates)
+  map_data <- cog_latlon %>%
+    mutate(x_plot = est_lon, xmin_plot = lwr_lon, xmax_plot = upr_lon, y_plot = est_lat)
+  
+  x_scale <- scale_x_continuous(breaks = c(-160, -145))
+  map_coord <- coord_sf(xlim = c(-162.5, -140), ylim = c(54, 60), expand = FALSE)
 }
 
-map
+# Build layered plot, so more recent years are on top
+years_ordered <- sort(unique(map_data$year))
+
+year_layers <- purrr::map(years_ordered, ~{
+  year_subset <- filter(map_data, year == .x)
+  list(
+    geom_errorbar(data = year_subset, 
+                  aes(x = x_plot, ymin = lwr_lat, ymax = upr_lat, color = year), 
+                  alpha = 0.4, width = 0),
+    geom_errorbarh(data = year_subset, 
+                   aes(y = y_plot, xmin = xmin_plot, xmax = xmax_plot, color = year), 
+                   alpha = 0.4, height = 0),
+    geom_point(data = year_subset, 
+               aes(x = x_plot, y = y_plot, color = year), size = 1.5)
+  )
+})
+
+# Assemble the final plot
+map <- ggplot() +
+  geom_sf(data = map_bg, fill = "grey90", color = "grey60") +
+  year_layers + # The ordered layers from purrr
+  facet_wrap(~species_code, ncol = 2) +
+  scale_color_viridis(name = "Year", option = "plasma", end = 0.9) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 3)) +
+  x_scale +
+  map_coord +
+  labs(x = NULL, y = NULL) 
+map  # view plot
 
 
 # Save plots ------------------------------------------------------------------
