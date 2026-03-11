@@ -20,9 +20,6 @@ if (file.exists("Z:/Projects/ConnectToOracle.R")) {
   channel <- gapindex::get_connected(check_access = FALSE)
 }
 
-## TODO: Set latest GOA survey year
-yr_goa <- 2025
-
 ## Define species and species groupings
 rf_groups <- data.frame(
   GROUP_CODE   = c(30060, 30050, 30050, 30050, 30576, 30420, 30152, 30020),
@@ -30,17 +27,28 @@ rf_groups <- data.frame(
 )
 
 ## Pull data
-gp_data <- 
-  gapindex::get_data(year_set = c(seq(from = 1990, to = 1999, by = 3),
-                                  seq(from = 2003, to = yr_goa, by = 2)),
-                     survey_set = "GOA",
-                     spp_codes = rf_groups,
-                     channel = channel
-  )
+if(survey == "GOA") {
+  gp_data <- 
+    gapindex::get_data(year_set = c(seq(from = 1990, to = 1999, by = 3),
+                                    seq(from = 2003, to = yr, by = 2)),
+                       survey_set = survey,
+                       spp_codes = rf_groups,
+                       channel = channel
+    )
+} 
+
+if(survey == "AI") {
+  gp_data <- 
+    gapindex::get_data(year_set = c(seq(from = 1991, to = 2000, by = 3),
+                                    seq(from = 2002, to = yr, by = 2)),
+                       survey_set = survey,
+                       spp_codes = rf_groups,
+                       channel = channel
+    )
+}
 
 ## Calculate cpue
 gp_cpue <- gapindex::calc_cpue(gapdata = gp_data) |> as.data.frame()
-
 
 calc_weighted_mean <- function(x, w, lwr_p = 0.025, upr_p = 0.975) {
   ## Count the number of records that have a positive weight (w) 
@@ -68,11 +76,21 @@ calc_weighted_mean <- function(x, w, lwr_p = 0.025, upr_p = 0.975) {
   )
 }
 
+## Translate latitude and longitdue to UTM
+utm <- sf::st_as_sf(
+  cbind.data.frame(X = gp_cpue$LONGITUDE_DD_START, 
+                   Y = gp_cpue$LATITUDE_DD_START), 
+  coords = c("X", "Y"), 
+  crs = 4326)
+utm <- sf::st_transform(utm, "+proj=utm +zone=5 +datum=WGS84 +units=km")
+utm <- data.frame(sf::st_coordinates(utm))
+
+gp_cpue <- cbind.data.frame(gp_cpue, X = utm$X, Y = utm$Y)
+
 ## Loop over metrics and calculate weighted means, SEs, and CIs 
 ## for each species and year
 cogs <- data.frame()
-for (imetric in c("DEPTH_M", "BOTTOM_TEMPERATURE_C", 
-                  "LATITUDE_DD_START", "LONGITUDE_DD_START")){
+for (imetric in c("DEPTH_M", "BOTTOM_TEMPERATURE_C", "X", "Y")){
   cogs <- 
     rbind(cogs,
           data.frame(
@@ -95,4 +113,4 @@ for (imetric in c("DEPTH_M", "BOTTOM_TEMPERATURE_C",
     ) 
 }
 
-write.csv(cogs, here::here("output", paste0("rf_cogs_", yr_goa, ".csv")), row.names = FALSE)
+write.csv(cogs, here::here("output", paste0("rf_cogs_", survey, "_", yr, ".csv")), row.names = FALSE)
