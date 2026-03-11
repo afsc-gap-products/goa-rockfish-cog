@@ -228,10 +228,24 @@ map <- ggplot() +
   scale_color_viridis(name = "Year", option = "plasma", end = 0.9) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 3)) +
   x_scale +
-  map_coord +
-  labs(x = NULL, y = NULL) 
-map  # view plot
+  map_coord 
 
+# Add landmark label (Adak Island) for the AI maps
+if(survey == "AI") {
+  adak <- data.frame(label = "Adak", x = (-176.66 + 360), y = 51.88)
+  map <- map +
+    # First, remove lat & lon labels, because they don't really help!
+    theme(axis.title = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank()) +
+    ggrepel::geom_text_repel(data = adak, aes(x = x, y = y, label = label),
+                             size = 3, color = "grey40",
+                             nudge_x = 1, nudge_y = -0.7, 
+                             segment.color = "grey40", segment.size = 0.3, 
+                             direction = "both")
+}
+
+map  # view plot
 
 # Save plots ------------------------------------------------------------------
 # Create a directory for latest GOA survey year if it doesn't already exist
