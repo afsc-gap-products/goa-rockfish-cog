@@ -30,4 +30,7 @@ theme_sleek <- function(base_size = 11, base_family = "") {
 theme_set(theme_sleek())  # set theme for all plots
 
 # Special colors from naturalparkcolors::park_palette("Saguaro)
-pal <- c("#847CA3", "#E45A5A", "#F4A65E", "#80792B", "#F2D56F", "#1A1237")
+# pal <- c("#847CA3", "#E45A5A", "#F4A65E", "#80792B", "#F2D56F", "#1A1237")
+
+# Custom palette
+pal <- c("#18377a", "#533549", "#d590da", "#be3144", "#ff7844", "#e3d26f")
