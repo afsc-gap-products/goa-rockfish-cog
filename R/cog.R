@@ -20,6 +20,9 @@ if (file.exists("Z:/Projects/ConnectToOracle.R")) {
   channel <- gapindex::get_connected(check_access = FALSE)
 }
 
+# Set year to current year
+yr <- as.numeric(format(Sys.Date(), "%Y"))
+
 ## Define species and species groupings
 rf_groups <- data.frame(
   GROUP_CODE   = c(30060, 30050, 30050, 30050, 30576, 30420, 30152, 30020),
@@ -76,16 +79,20 @@ calc_weighted_mean <- function(x, w, lwr_p = 0.025, upr_p = 0.975) {
   )
 }
 
-## Translate latitude and longitdue to UTM
-utm <- sf::st_as_sf(
+## Translate latitude and longitdue to Alaska Albers
+aa <- sf::st_as_sf(
   cbind.data.frame(X = gp_cpue$LONGITUDE_DD_START, 
                    Y = gp_cpue$LATITUDE_DD_START), 
   coords = c("X", "Y"), 
   crs = 4326)
-utm <- sf::st_transform(utm, "+proj=utm +zone=5 +datum=WGS84 +units=km")
-utm <- data.frame(sf::st_coordinates(utm))
+aa <- sf::st_transform(aa, crs = 3338)
+aa <- data.frame(sf::st_coordinates(aa))
 
-gp_cpue <- cbind.data.frame(gp_cpue, X = utm$X, Y = utm$Y)
+gp_cpue <- cbind.data.frame(gp_cpue, X = aa$X, Y = aa$Y)
+
+# Convert eastings/northings from meters to kilometers
+gp_cpue$X <- gp_cpue$X / 1000
+gp_cpue$Y <- gp_cpue$Y / 1000
 
 ## Loop over metrics and calculate weighted means, SEs, and CIs 
 ## for each species and year

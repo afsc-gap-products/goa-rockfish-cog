@@ -30,9 +30,6 @@ source(here("R", "aesthetics.R"))
 # TODO: Set survey area
 survey <- c("AI", "GOA")[1]
 
-# Set year to current year
-yr <- as.numeric(format(Sys.Date(), "%Y"))
-
 # Calculate empirical cog using R script.
 source(here("R", "cog.R"))
 
@@ -75,14 +72,15 @@ ts_plot  # view plot
 
 
 # Sparkleplot (bivariate scatter plot for lat & lon) --------------------------
-# Transform UTM to latitude/longidue (for estimates, upper & lower bounds)
-coord_transform <- function(column) {
-  utm <- data.frame(Y = cogs_plot[cogs_plot$metric == "Northings (km)", column],
-                    X = cogs_plot[cogs_plot$metric == "Eastings (km)", column])
-  latlon <- sf::st_as_sf(utm,
+# Transform Alaska Albers to latitude/longidue (for estimates, upper & lower bounds)
+coord_transform <- function(column, crs) {
+  # Pull out geographic info and convert back to m so conversion will work
+  aa <- bind_cols(Y = cogs_plot[cogs_plot$metric == "Northings (km)", column] * 1000,
+                  X = cogs_plot[cogs_plot$metric == "Eastings (km)", column] * 1000)
+  latlon <- sf::st_as_sf(aa,
                          coords = c("X", "Y"),
-                         crs = "+proj=utm +zone=5 +datum=WGS84 +units=km")
-  latlon <- sf::st_transform(latlon, crs = 4326)
+                         crs = 3338)
+  latlon <- sf::st_transform(latlon, crs = crs)
   latlon <- data.frame(sf::st_coordinates(latlon))
   latlon_out <- cbind.data.frame(species_code = cogs_plot[cogs_plot$metric == "Eastings (km)", "species_code"],
                                  year = cogs_plot[cogs_plot$metric == "Eastings (km)", "year"],
@@ -95,10 +93,10 @@ coord_transform <- function(column) {
   return(latlon_out)
 }
 
-coord_out <- cbind.data.frame(coord_transform("est"),
-                              se = coord_transform("se")$se,
-                              lwr = coord_transform("lwr")$lwr,
-                              upr = coord_transform("upr")$upr)
+coord_out <- cbind.data.frame(coord_transform("est", 4326),
+                              se = coord_transform("se", 4326)$se,
+                              lwr = coord_transform("lwr", 4326)$lwr,
+                              upr = coord_transform("upr", 4326)$upr)
 
 cog_lat <- coord_out[coord_out$metric == "Latitude", c(1:4, 6:7)]
 colnames(cog_lat)[4:6] <- c("est_lat", "lwr_lat", "upr_lat")
