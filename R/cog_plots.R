@@ -30,9 +30,6 @@ source(here("R", "aesthetics.R"))
 # TODO: Set survey area
 survey <- c("AI", "GOA")[1]
 
-# Set year to current year
-yr <- as.numeric(format(Sys.Date(), "%Y"))
-
 # Calculate empirical cog using R script.
 source(here("R", "cog.R"))
 
@@ -58,7 +55,7 @@ cogs_plot <- cogs %>%
   # Make depth estimates negative for inverted axis when plotting
   mutate(est = if_else(metric == "Depth (m)", -est, est),
          upr = if_else(metric == "Depth (m)", -upr, upr),
-         lwr = if_else(metric == "Depth (m)", -lwr, lwr))
+         lwr = if_else(metric == "Depth (m)", -lwr, lwr)) 
 
 
 # Time series plot ------------------------------------------------------------
@@ -75,14 +72,15 @@ ts_plot  # view plot
 
 
 # Sparkleplot (bivariate scatter plot for lat & lon) --------------------------
-# Transform UTM to latitude/longidue (for estimates, upper & lower bounds)
-coord_transform <- function(column) {
-  utm <- data.frame(Y = cogs_plot[cogs_plot$metric == "Northings (km)", column],
-                    X = cogs_plot[cogs_plot$metric == "Eastings (km)", column])
-  latlon <- sf::st_as_sf(utm,
+# Transform Alaska Albers to latitude/longidue (for estimates, upper & lower bounds)
+coord_transform <- function(column, crs) {
+  # Pull out geographic info and convert back to m so conversion will work
+  aa <- bind_cols(Y = cogs_plot[cogs_plot$metric == "Northings (km)", column] * 1000,
+                  X = cogs_plot[cogs_plot$metric == "Eastings (km)", column] * 1000)
+  latlon <- sf::st_as_sf(aa,
                          coords = c("X", "Y"),
-                         crs = "+proj=utm +zone=5 +datum=WGS84 +units=km")
-  latlon <- sf::st_transform(latlon, crs = 4326)
+                         crs = 3338)
+  latlon <- sf::st_transform(latlon, crs = crs)
   latlon <- data.frame(sf::st_coordinates(latlon))
   latlon_out <- cbind.data.frame(species_code = cogs_plot[cogs_plot$metric == "Eastings (km)", "species_code"],
                                  year = cogs_plot[cogs_plot$metric == "Eastings (km)", "year"],
@@ -95,10 +93,10 @@ coord_transform <- function(column) {
   return(latlon_out)
 }
 
-coord_out <- cbind.data.frame(coord_transform("est"),
-                              se = coord_transform("se")$se,
-                              lwr = coord_transform("lwr")$lwr,
-                              upr = coord_transform("upr")$upr)
+coord_out <- cbind.data.frame(coord_transform("est", 4326),
+                              se = coord_transform("se", 4326)$se,
+                              lwr = coord_transform("lwr", 4326)$lwr,
+                              upr = coord_transform("upr", 4326)$upr)
 
 cog_lat <- coord_out[coord_out$metric == "Latitude", c(1:4, 6:7)]
 colnames(cog_lat)[4:6] <- c("est_lat", "lwr_lat", "upr_lat")
@@ -211,10 +209,14 @@ year_layers <- purrr::map(years_ordered, ~{
   list(
     geom_errorbar(data = year_subset, 
                   aes(x = x_plot, ymin = lwr_lat, ymax = upr_lat, color = year), 
-                  alpha = 0.4, width = 0),
-    geom_errorbarh(data = year_subset, 
-                   aes(y = y_plot, xmin = xmin_plot, xmax = xmax_plot, color = year), 
-                   alpha = 0.4, height = 0),
+                  alpha = 0.4, 
+                  width = 0, 
+                  orientation = "x"),
+    geom_errorbar(data = year_subset, 
+                  aes(y = y_plot, xmin = xmin_plot, xmax = xmax_plot, color = year), 
+                  alpha = 0.4,
+                  width = 0, 
+                  orientation = "y"),
     geom_point(data = year_subset, 
                aes(x = x_plot, y = y_plot, color = year), size = 1.5)
   )
@@ -228,7 +230,8 @@ map <- ggplot() +
   scale_color_viridis(name = "Year", option = "plasma", end = 0.9) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 3)) +
   x_scale +
-  map_coord 
+  map_coord +
+  xlab("") + ylab("")
 
 # Add landmark label (Adak Island) for the AI maps
 if(survey == "AI") {
