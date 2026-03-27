@@ -20,8 +20,8 @@ if (file.exists("Z:/Projects/ConnectToOracle.R")) {
   channel <- gapindex::get_connected(check_access = FALSE)
 }
 
-## TODO: Set latest GOA survey year
-yr_goa <- 2025
+# Set year to current year
+yr <- as.numeric(format(Sys.Date(), "%Y"))
 
 ## Define species and species groupings
 rf_groups <- data.frame(
@@ -30,17 +30,28 @@ rf_groups <- data.frame(
 )
 
 ## Pull data
-gp_data <- 
-  gapindex::get_data(year_set = c(seq(from = 1990, to = 1999, by = 3),
-                                  seq(from = 2003, to = yr_goa, by = 2)),
-                     survey_set = "GOA",
-                     spp_codes = rf_groups,
-                     channel = channel
-  )
+if(survey == "GOA") {
+  gp_data <- 
+    gapindex::get_data(year_set = c(seq(from = 1990, to = 1999, by = 3),
+                                    seq(from = 2003, to = yr, by = 2)),
+                       survey_set = survey,
+                       spp_codes = rf_groups,
+                       channel = channel
+    )
+} 
+
+if(survey == "AI") {
+  gp_data <- 
+    gapindex::get_data(year_set = c(seq(from = 1991, to = 2000, by = 3),
+                                    seq(from = 2002, to = yr, by = 2)),
+                       survey_set = survey,
+                       spp_codes = rf_groups,
+                       channel = channel
+    )
+}
 
 ## Calculate cpue
 gp_cpue <- gapindex::calc_cpue(gapdata = gp_data) |> as.data.frame()
-
 
 calc_weighted_mean <- function(x, w, lwr_p = 0.025, upr_p = 0.975) {
   ## Count the number of records that have a positive weight (w) 
@@ -68,11 +79,25 @@ calc_weighted_mean <- function(x, w, lwr_p = 0.025, upr_p = 0.975) {
   )
 }
 
+## Translate latitude and longitdue to Alaska Albers
+aa <- sf::st_as_sf(
+  cbind.data.frame(X = gp_cpue$LONGITUDE_DD_START, 
+                   Y = gp_cpue$LATITUDE_DD_START), 
+  coords = c("X", "Y"), 
+  crs = 4326)
+aa <- sf::st_transform(aa, crs = 3338)
+aa <- data.frame(sf::st_coordinates(aa))
+
+gp_cpue <- cbind.data.frame(gp_cpue, X = aa$X, Y = aa$Y)
+
+# Convert eastings/northings from meters to kilometers
+gp_cpue$X <- gp_cpue$X / 1000
+gp_cpue$Y <- gp_cpue$Y / 1000
+
 ## Loop over metrics and calculate weighted means, SEs, and CIs 
 ## for each species and year
 cogs <- data.frame()
-for (imetric in c("DEPTH_M", "BOTTOM_TEMPERATURE_C", 
-                  "LATITUDE_DD_START", "LONGITUDE_DD_START")){
+for (imetric in c("DEPTH_M", "BOTTOM_TEMPERATURE_C", "X", "Y")){
   cogs <- 
     rbind(cogs,
           data.frame(
@@ -95,4 +120,4 @@ for (imetric in c("DEPTH_M", "BOTTOM_TEMPERATURE_C",
     ) 
 }
 
-write.csv(cogs, here::here("output", paste0("rf_cogs_", yr_goa, ".csv")), row.names = FALSE)
+write.csv(cogs, here::here("output", paste0("rf_cogs_", survey, "_", yr, ".csv")), row.names = FALSE)
